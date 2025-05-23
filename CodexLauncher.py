@@ -1,10 +1,10 @@
 import tkinter as tk
 from tkinter import messagebox, PhotoImage
 import subprocess
-import sys
 import os
 import urllib.request
 
+# --- Functions ---
 def launch_codex():
     codex_path = os.path.join(os.environ["LOCALAPPDATA"], "Codex", "codex.exe")
     if os.path.exists(codex_path):
@@ -26,20 +26,14 @@ def check_for_updates():
     codex_dir = os.path.join(os.environ["LOCALAPPDATA"], "Codex")
     updater_path = os.path.join(codex_dir, "CodexUpdate.exe")
     updater_url = "https://github.com/Fir3Fly1995/PyCodex/raw/main/dist/CodexUpdate.exe"
-
     try:
-        # Remove the old updater if it exists
         if os.path.exists(updater_path):
             try:
                 os.remove(updater_path)
             except Exception as e:
                 messagebox.showerror("Error", f"Could not remove old updater: {e}")
                 return
-
-        # Download the latest updater directly to the correct name
         urllib.request.urlretrieve(updater_url, updater_path)
-
-        # Launch the updater
         if os.path.exists(updater_path):
             subprocess.Popen([updater_path], cwd=codex_dir)
             root.after(1000, root.destroy)
@@ -52,49 +46,45 @@ def close_launcher():
     os._exit(0)
 
 def start_move(event):
-    if event.y <= 40:
-        root.startX = event.x_root
-        root.startY = event.y_root
-    else:
-        root.startX = None
-        root.startY = None
+    root._drag_start_x = event.x_root
+    root._drag_start_y = event.y_root
+    root._start_win_x = root.winfo_x()
+    root._start_win_y = root.winfo_y()
 
 def do_move(event):
-    if root.startX is not None and root.startY is not None:
-        x = event.x_root - root.startX
-        y = event.y_root - root.startY
-        new_x = root.winfo_x() + x
-        new_y = root.winfo_y() + y
-        root.geometry(f"+{new_x}+{new_y}")
-        root.startX = event.x_root
-        root.startY = event.y_root
+    dx = event.x_root - root._drag_start_x
+    dy = event.y_root - root._drag_start_y
+    new_x = root._start_win_x + dx
+    new_y = root._start_win_y + dy
 
-def stop_move(event):
-    root.startX = None
-    root.startY = None
+    # Clamp to screen
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    win_width = root.winfo_width()
+    win_height = root.winfo_height()
+    new_x = max(0, min(new_x, screen_width - win_width))
+    new_y = max(0, min(new_y, screen_height - win_height))
 
+    root.geometry(f"+{new_x}+{new_y}")
+
+# --- Main UI ---
 root = tk.Tk()
 root.geometry("1024x512")
 root.configure(bg="black")
 root.overrideredirect(True)
 
-# Center the window on the screen
+# Center the window
 root.update_idletasks()
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
-window_width = 1024
-window_height = 512
-x = (screen_width // 2) - (window_width // 2)
-y = (screen_height // 2) - (window_height // 2)
-root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+x = (screen_width // 2) - (1024 // 2)
+y = (screen_height // 2) - (512 // 2)
+root.geometry(f"1024x512+{x}+{y}")
 
 canvas = tk.Canvas(root, width=1024, height=512, highlightthickness=0, bg="black")
 canvas.pack(fill="both", expand=True)
 
-canvas.bind("<ButtonPress-1>", start_move)
-canvas.bind("<B1-Motion>", do_move)
-canvas.bind("<ButtonRelease-1>", stop_move)
-
+# Load background
 bg_path = os.path.join(os.environ["LOCALAPPDATA"], "Codex", "CodexBG.png")
 if os.path.exists(bg_path):
     try:
@@ -104,6 +94,30 @@ if os.path.exists(bg_path):
     except Exception as e:
         print(f"Failed to load background image: {e}")
 
+# --- Top bar for dragging and close ---
+top_bar = tk.Frame(root, height=40, bg="black", cursor="fleur", highlightthickness=0, bd=0)
+top_bar.place(x=0, y=0, relwidth=1)
+top_bar.lift()
+top_bar.bind("<ButtonPress-1>", start_move)
+top_bar.bind("<B1-Motion>", do_move)
+
+def on_enter_x(e):
+    e.widget.config(bg="#ff4444", activebackground="#ff4444")
+
+def on_leave_x(e):
+    e.widget.config(bg="#cc4444", activebackground="#cc4444")
+
+btn_x = tk.Button(
+    root, text="✕", command=close_launcher, bg="#cc4444", fg="black",
+    font=("Segoe UI", 18, "bold"), bd=0, highlightthickness=0, relief="flat",
+    activebackground="#cc4444", activeforeground="black"
+)
+btn_x.place(x=1024-40, y=0, width=40, height=40)
+btn_x.lift()
+btn_x.bind("<Enter>", on_enter_x)
+btn_x.bind("<Leave>", on_leave_x)
+
+# --- Buttons ---
 button_style = {
     "bg": "#222222",
     "fg": "#ffffff",
@@ -116,18 +130,34 @@ button_style = {
     "height": 2
 }
 
+def on_enter_btn(e):
+    e.widget.config(bg="#333333", activebackground="#333333")
+
+def on_leave_btn(e):
+    e.widget.config(bg="#222222", activebackground="#444444")
+
 launch_btn = tk.Button(root, text="Launch Codex", command=launch_codex, **button_style)
 update_btn = tk.Button(root, text="Check for Updates", command=check_for_updates, **button_style)
 uninstall_btn = tk.Button(root, text="Uninstall Codex", command=uninstall_codex, **button_style)
 
-# Close button inside canvas
-close_btn = tk.Button(canvas, text="X", command=close_launcher, bg="#222222", fg="#ffffff", 
-                      activebackground="#aa0000", activeforeground="#ffffff", font=("Segoe UI", 10, "bold"),
-                      bd=0, highlightthickness=0, width=3, height=1)
-
 launch_btn.place(x=50, y=230)
 update_btn.place(x=50, y=290)
 uninstall_btn.place(x=50, y=350)
-canvas.create_window(1000, 492, anchor="se", window=close_btn)
+
+# Add hover effects
+for btn in (launch_btn, update_btn, uninstall_btn):
+    btn.bind("<Enter>", on_enter_btn)
+    btn.bind("<Leave>", on_leave_btn)
+
+# Version label in the bottom left corner
+version_label = tk.Label(
+    root,
+    text="Version Number 0x1F.0x1",
+    bg="black",
+    fg="#888888",
+    font=("Segoe UI", 8),
+    anchor="w"
+)
+version_label.place(x=8, y=512-20)
 
 root.mainloop()

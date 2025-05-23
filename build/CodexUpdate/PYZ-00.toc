@@ -1,4 +1,4 @@
-('D:\\GitHub\\PyCodex\\build\\CodexUpdate\\PYZ-00.pyz',
+('D:\\GitHub\\PyCodex\\build\\codexupdate\\PYZ-00.pyz',
  [('__future__',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\__future__.py',
@@ -372,6 +372,10 @@
   ('gettext',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\gettext.py',
+   'PYMODULE'),
+  ('glob',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\glob.py',
    'PYMODULE'),
   ('gzip',
    'C:\\Program '
@@ -997,6 +1001,10 @@
    'PYMODULE'),
   ('urllib3.util.wait',
    'd:\\GitHub\\PyCodex\\.venv\\Lib\\site-packages\\urllib3\\util\\wait.py',
+   'PYMODULE'),
+  ('webbrowser',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\webbrowser.py',
    'PYMODULE'),
   ('xml',
    'C:\\Program '
