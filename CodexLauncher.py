@@ -152,7 +152,7 @@ for btn in (launch_btn, update_btn, uninstall_btn):
 # Version label in the bottom left corner
 version_label = tk.Label(
     root,
-    text="Version Number 0x1F.0x1",
+    text="Version Number v32.1",
     bg="black",
     fg="#888888",
     font=("Segoe UI", 8),
