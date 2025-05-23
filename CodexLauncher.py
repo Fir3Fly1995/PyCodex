@@ -3,6 +3,7 @@ from tkinter import messagebox, PhotoImage
 import subprocess
 import sys
 import os
+import urllib.request
 
 def launch_codex():
     codex_path = os.path.join(os.environ["LOCALAPPDATA"], "Codex", "codex.exe")
@@ -24,14 +25,28 @@ def uninstall_codex():
 def check_for_updates():
     codex_dir = os.path.join(os.environ["LOCALAPPDATA"], "Codex")
     updater_path = os.path.join(codex_dir, "CodexUpdate.exe")
-    if os.path.exists(updater_path):
-        try:
+    updater_url = "https://github.com/Fir3Fly1995/PyCodex/raw/main/dist/CodexUpdate.exe"
+
+    try:
+        # Remove the old updater if it exists
+        if os.path.exists(updater_path):
+            try:
+                os.remove(updater_path)
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not remove old updater: {e}")
+                return
+
+        # Download the latest updater directly to the correct name
+        urllib.request.urlretrieve(updater_url, updater_path)
+
+        # Launch the updater
+        if os.path.exists(updater_path):
             subprocess.Popen([updater_path], cwd=codex_dir)
             root.after(1000, root.destroy)
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to launch updater: {e}")
-    else:
-        messagebox.showerror("Error", f"CodexUpdate.exe not found at {updater_path}")
+        else:
+            messagebox.showerror("Error", f"CodexUpdate.exe not found at {updater_path}")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to fetch or launch updater:\n{e}")
 
 def close_launcher():
     os._exit(0)
