@@ -26,8 +26,8 @@ def check_for_updates():
     codex_dir = os.path.join(os.environ["LOCALAPPDATA"], "Codex")
     updater_path = os.path.join(codex_dir, "CodexUpdate.exe")
     updater_url = "https://github.com/Fir3Fly1995/PyCodex/raw/main/dist/CodexUpdate.exe"
-    bg_url = "https://github.com/Fir3Fly1995/PyCodex/raw/main/Images/UpdateBG.png"
-    bg_path = os.path.join(codex_dir, "UpdateBG.png")  # <-- Corrected filename
+    bg_url = "https://github.com/Fir3Fly1995/PyCodex/raw/main/Images/UpdateBG.png"  # <-- Corrected!
+    bg_path = os.path.join(codex_dir, "UpdateBG.png")
     try:
         # Download updater
         if os.path.exists(updater_path):
