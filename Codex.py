@@ -1,9 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-import pymupdf as fitz
 import fitz  # PyMuPDF
 import re
 import os
+import sys
+import subprocess
 
 # --- Ask user for PDF file ---
 root = tk.Tk()
@@ -13,8 +14,17 @@ pdf_path = filedialog.askopenfilename(
     filetypes=[("PDF files", "*.pdf")],
 )
 if not pdf_path:
-    messagebox.showerror("No file selected", "You must select a PDF file to continue.")
-    exit()
+    answer = messagebox.askyesno("Cancel", "Are you sure you want to cancel?\n\nPress Yes to exit and return to the launcher.\nPress No to select a file again.")
+    if answer:
+        # Relaunch the launcher if it exists
+        launcher_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Codex", "CodexLauncher.exe")
+        if os.path.exists(launcher_path):
+            subprocess.Popen([launcher_path], cwd=os.path.dirname(launcher_path))
+        os._exit(0)
+    else:
+        # Restart the program
+        python = sys.executable
+        os.execl(python, python, *sys.argv)
 root.deiconify()  # Show main window
 
 PDF_PATH = pdf_path
@@ -59,10 +69,10 @@ def build_codex_structure(sections):
             part_name = None
         elif s["level"] == 3 and set_name and stage_name:
             part_name = s["title"]
-            codex_structure[set_name][stage_name][part_name] = s["text"]
+            codex_structure[set_name][stage_name][part_name] = {
+                "_home": s["text"]
+            }
         elif s["level"] == 4 and set_name and stage_name and part_name:
-            if isinstance(codex_structure[set_name][stage_name][part_name], str):
-                codex_structure[set_name][stage_name][part_name] = {}
             codex_structure[set_name][stage_name][part_name][s["title"]] = s["text"]
     return codex_structure
 
@@ -76,36 +86,47 @@ def after_dash(title):
 root.title("Codex")
 root.geometry("1000x700")
 
+# Home controls at the top
+top_frame = ttk.Frame(root)
+top_frame.pack(fill='x', pady=5)
+
+def restart_app():
+    python = sys.executable
+    os.execl(python, python, *sys.argv)
+
+select_file_btn = ttk.Button(top_frame, text="Select New File", command=restart_app)
+select_file_btn.pack(side='left', padx=10)
+
+def exit_and_launch_launcher():
+    launcher_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Codex", "CodexLauncher.exe")
+    try:
+        if os.path.exists(launcher_path):
+            subprocess.Popen([launcher_path], cwd=os.path.dirname(launcher_path))
+    except Exception:
+        pass
+    root.after(1000, lambda: os._exit(0))
+
+exit_btn = ttk.Button(top_frame, text="Exit", command=exit_and_launch_launcher)
+exit_btn.pack(side='left', padx=10)
+
+info_label = ttk.Label(top_frame, text="More features coming soon!", font=("Segoe UI", 12, "italic"))
+info_label.pack(side='left', padx=20)
+
+# Tab Notebooks (no labels)
 set_notebook = ttk.Notebook(root)
 set_notebook.pack(fill='x')
+
 stage_notebook = ttk.Notebook(root)
 stage_notebook.pack(fill='x')
+
 part_notebook = ttk.Notebook(root)
 part_notebook.pack(fill='x')
+
 subpart_notebook = ttk.Notebook(root)
 subpart_notebook.pack(fill='x')
 
 content_text = tk.Text(root, wrap='word', height=20, font=("Segoe UI", 12))
 content_text.pack(fill='both', expand=True)
-
-home_frame = ttk.Frame(set_notebook)
-set_notebook.add(home_frame, text="Home")
-
-def restart_app():
-    import sys, os, shlex, subprocess
-    script = os.path.abspath(sys.argv[0])
-    subprocess.Popen([sys.executable, script] + sys.argv[1:])
-    os._exit(0)
-
-
-select_file_btn = ttk.Button(home_frame, text="Select New File", command=restart_app)
-select_file_btn.pack(pady=20)
-
-exit_btn = ttk.Button(home_frame, text="Exit", command=lambda: os._exit(0))
-exit_btn.pack(pady=10)
-
-info_label = ttk.Label(home_frame, text="More features coming soon!", font=("Segoe UI", 12, "italic"))
-info_label.pack(pady=10)
 
 set_tab_names = list(codex_structure.keys())
 
@@ -156,9 +177,13 @@ def show_subparts(set_index, stage_index, part_index):
         return
     part_name = part_names[part_index]
     subparts = codex_structure[set_name][stage_name][part_name]
-    if isinstance(subparts, str):
-        return
+    # Add "Home" tab first if present
+    if "_home" in subparts:
+        frame = ttk.Frame(subpart_notebook)
+        subpart_notebook.add(frame, text="Home")
     for subpart in subparts:
+        if subpart == "_home":
+            continue
         frame = ttk.Frame(subpart_notebook)
         subpart_notebook.add(frame, text=after_dash(subpart))
 
@@ -179,10 +204,21 @@ def show_content(set_index, stage_index, part_index, subpart_index=None):
     if isinstance(subparts, str):
         content_text.insert(tk.END, subparts)
         return
-    if subpart_index is not None and subpart_index < len(subparts):
-        subpart_names = list(subparts.keys())
-        content = subparts[subpart_names[subpart_index]]
-        content_text.insert(tk.END, content)
+    subpart_names = list(subparts.keys())
+    # If subpart_index is None or 0, show "Home" content if present
+    if subpart_index is None or subpart_index == 0:
+        if "_home" in subparts:
+            content_text.insert(tk.END, subparts["_home"])
+            return
+        elif subpart_names:
+            content_text.insert(tk.END, subparts[subpart_names[0]])
+            return
+    if subpart_index is not None and subpart_index < len(subpart_names):
+        subpart_key = subpart_names[subpart_index]
+        if subpart_key == "_home":
+            content_text.insert(tk.END, subparts["_home"])
+        else:
+            content_text.insert(tk.END, subparts[subpart_key])
 
 set_notebook.bind("<<NotebookTabChanged>>", lambda e: [
     show_stages(set_notebook.index("current")),

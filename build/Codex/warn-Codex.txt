@@ -58,8 +58,6 @@ missing module named multiprocessing.get_start_method - imported by multiprocess
 missing module named multiprocessing.Pool - imported by multiprocessing (delayed, conditional), scipy._lib._util (delayed, conditional)
 missing module named collections.Mapping - imported by collections (optional), pytz.lazy (optional)
 missing module named fcntl - imported by subprocess (optional)
-missing module named tools - imported by fitz (top-level)
-missing module named frontend - imported by fitz (top-level)
 missing module named asyncio.DefaultEventLoopPolicy - imported by asyncio (delayed, conditional), asyncio.events (delayed, conditional)
 missing module named six.moves.range - imported by six.moves (top-level), dateutil.rrule (top-level)
 runtime module named six.moves - imported by dateutil.tz.tz (top-level), dateutil.tz._factories (top-level), dateutil.tz.win (top-level), dateutil.rrule (top-level)

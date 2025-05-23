@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['CodexLauncher.py'],
+    ['codexlauncher.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='CodexLauncher',
+    name='codexlauncher',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -35,4 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['D:\\GitHub\\PyCodex\\Images\\CodexLogo.ico'],
 )
