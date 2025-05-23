@@ -63,6 +63,16 @@ root.geometry("1024x512")
 root.configure(bg="black")
 root.overrideredirect(True)
 
+# Center the window on the screen
+root.update_idletasks()
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+window_width = 1024
+window_height = 512
+x = (screen_width // 2) - (window_width // 2)
+y = (screen_height // 2) - (window_height // 2)
+root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
 canvas = tk.Canvas(root, width=1024, height=512, highlightthickness=0, bg="black")
 canvas.pack(fill="both", expand=True)
 
