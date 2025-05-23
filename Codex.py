@@ -1,247 +1,207 @@
+# Codex Navigator UI v2.8 – Scroll Focus Fix & Workspace Resize
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import fitz  # PyMuPDF
-import re
 import os
 import sys
 import subprocess
+import re
+from PIL import Image, ImageTk
+from io import BytesIO
 
-# --- Ask user for PDF file ---
+# Compatibility: Use Resampling for PIL >= 10
+if hasattr(Image, 'Resampling'):
+    RESAMPLING_MODE = Image.Resampling.LANCZOS
+else:
+    RESAMPLING_MODE = Image.ANTIALIAS
+
+# --- Root Setup ---
 root = tk.Tk()
-root.withdraw()  # Hide main window while selecting file
+root.title("Codex Visual Navigator")
+root.geometry("1180x720")  # Reduced width by 100px
+root.minsize(1180, 720)
+
 pdf_path = filedialog.askopenfilename(
-    title="Select a PDF file",
-    filetypes=[("PDF files", "*.pdf")],
+    title="Select a Codex PDF",
+    filetypes=[("PDF files", "*.pdf")]
 )
+
 if not pdf_path:
-    answer = messagebox.askyesno("Cancel", "Are you sure you want to cancel?\n\nPress Yes to exit and return to the launcher.\nPress No to select a file again.")
-    if answer:
-        # Relaunch the launcher if it exists
-        launcher_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Codex", "CodexLauncher.exe")
-        if os.path.exists(launcher_path):
-            subprocess.Popen([launcher_path], cwd=os.path.dirname(launcher_path))
-        os._exit(0)
-    else:
-        # Restart the program
-        python = sys.executable
-        os.execl(python, python, *sys.argv)
-root.deiconify()  # Show main window
+    sys.exit()
 
-PDF_PATH = pdf_path
+# --- PDF Extraction ---
+doc = fitz.open(pdf_path)
+toc = doc.get_toc()
 
-# --- Extract PDF structure and content ---
-doc = fitz.open(PDF_PATH)
-toc = doc.get_toc()  # [[level, title, page], ...]
-toc_with_ranges = []
+parsed_sections = []
 for i in range(len(toc)):
     level, title, start_page = toc[i]
-    end_page = toc[i+1][2] if i + 1 < len(toc) else len(doc)
-    # Cap each section at the next heading of same or higher level
-    for j in range(i + 1, len(toc)):
-        if toc[j][0] <= level:
-            end_page = toc[j][2]
-            break
-    toc_with_ranges.append((level, title, start_page, end_page))
-
-sections = []
-for level, title, start, end in toc_with_ranges:
-    text = "\n".join([doc[pg].get_text("text") for pg in range(start - 1, end - 1)])
-    sections.append({
+    if i + 1 < len(toc):
+        end_page = toc[i + 1][2]
+    else:
+        end_page = len(doc)
+    parsed_sections.append({
         "level": level,
         "title": title,
-        "start_page": start,
-        "end_page": end,
-        "text": text.strip()
+        "start": start_page,
+        "end": end_page
     })
 
-# --- Build nested structure: Set > Stage > Part > Subpart ---
-def build_codex_structure(sections):
-    codex_structure = {}
-    set_name = stage_name = part_name = None
-    for s in sections:
-        if s["level"] == 1:
-            set_name = s["title"]
-            codex_structure[set_name] = {}
-            stage_name = part_name = None
-        elif s["level"] == 2 and set_name:
-            stage_name = s["title"]
-            codex_structure[set_name][stage_name] = {}
-            part_name = None
-        elif s["level"] == 3 and set_name and stage_name:
-            part_name = s["title"]
-            codex_structure[set_name][stage_name][part_name] = {
-                "_home": s["text"]
-            }
-        elif s["level"] == 4 and set_name and stage_name and part_name:
-            codex_structure[set_name][stage_name][part_name][s["title"]] = s["text"]
-    return codex_structure
-
-codex_structure = build_codex_structure(sections)
-
-def after_dash(title):
-    match = re.search(r"-\s*(.+)", title)
-    return match.group(1).strip() if match else title.strip()
-
-# --- Tkinter GUI ---
-root.title("Codex")
-root.geometry("1000x700")
-
-# Home controls at the top
+# --- UI Layout ---
 top_frame = ttk.Frame(root)
-top_frame.pack(fill='x', pady=5)
+top_frame.pack(fill='x')
 
-def restart_app():
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
+view_mode = tk.StringVar(value="image")
 
-select_file_btn = ttk.Button(top_frame, text="Select New File", command=restart_app)
-select_file_btn.pack(side='left', padx=10)
+exit_btn = ttk.Button(top_frame, text="Exit", command=lambda: os._exit(0))
+exit_btn.pack(side='right', padx=5, pady=5)
 
-def exit_and_launch_launcher():
-    launcher_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Codex", "CodexLauncher.exe")
-    try:
-        if os.path.exists(launcher_path):
-            subprocess.Popen([launcher_path], cwd=os.path.dirname(launcher_path))
-    except Exception:
-        pass
-    root.after(1000, lambda: os._exit(0))
+restart_btn = ttk.Button(top_frame, text="Open Other", command=lambda: os.execl(sys.executable, sys.executable, *sys.argv))
+restart_btn.pack(side='right', padx=5, pady=5)
 
-exit_btn = ttk.Button(top_frame, text="Exit", command=exit_and_launch_launcher)
-exit_btn.pack(side='left', padx=10)
+toggle_btn = ttk.Button(top_frame, text="Toggle View Mode")
+toggle_btn.pack(side='right', padx=5, pady=5)
 
-info_label = ttk.Label(top_frame, text="More features coming soon!", font=("Segoe UI", 12, "italic"))
-info_label.pack(side='left', padx=20)
+label = ttk.Label(top_frame, text="Codex Navigator", font=("Segoe UI", 14, "bold"))
+label.pack(side='left', padx=10)
 
-# Tab Notebooks (no labels)
-set_notebook = ttk.Notebook(root)
-set_notebook.pack(fill='x')
+main_pane = ttk.PanedWindow(root, orient=tk.HORIZONTAL)
+main_pane.pack(fill='both', expand=True)
 
-stage_notebook = ttk.Notebook(root)
-stage_notebook.pack(fill='x')
+# --- Tree Panel ---
+tree_container = ttk.Frame(main_pane, width=300)
+main_pane.add(tree_container, weight=1)
 
-part_notebook = ttk.Notebook(root)
-part_notebook.pack(fill='x')
+tree_scroll = ttk.Scrollbar(tree_container, orient="vertical")
+tree_scroll.pack(side="right", fill="y")
 
-subpart_notebook = ttk.Notebook(root)
-subpart_notebook.pack(fill='x')
+tree = ttk.Treeview(tree_container, yscrollcommand=tree_scroll.set)
+tree.pack(fill='both', expand=True, padx=5, pady=5)
+tree_scroll.config(command=tree.yview)
 
-content_text = tk.Text(root, wrap='word', height=20, font=("Segoe UI", 12))
-content_text.pack(fill='both', expand=True)
+# Scroll isolation for tree
 
-set_tab_names = list(codex_structure.keys())
+def on_tree_scroll(event):
+    tree.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-for set_name in set_tab_names:
-    frame = ttk.Frame(set_notebook)
-    set_notebook.add(frame, text=after_dash(set_name))
+tree.bind("<Enter>", lambda e: root.bind_all("<MouseWheel>", on_tree_scroll))
+tree.bind("<Leave>", lambda e: root.unbind_all("<MouseWheel>"))
 
-def clear_notebook(notebook):
-    for tab_id in notebook.tabs():
-        notebook.forget(tab_id)
+# --- Workspace Panel ---
+workspace = tk.Frame(main_pane, bg="#1a1a1a")
+main_pane.add(workspace, weight=3)
 
-def show_stages(set_index):
-    clear_notebook(stage_notebook)
-    clear_notebook(part_notebook)
-    clear_notebook(subpart_notebook)
-    if set_index < 1 or set_index - 1 >= len(set_tab_names):
+content_frame = ttk.Frame(workspace)
+content_frame.pack(fill='both', expand=True)
+
+selected_section = {}
+
+# --- Content Display Functions ---
+def show_section_as_image(sec):
+    for widget in content_frame.winfo_children():
+        widget.destroy()
+
+    canvas = tk.Canvas(content_frame, bg="#1a1a1a", highlightthickness=0)
+    canvas.pack(side="left", fill="both", expand=True)
+
+    v_scroll = ttk.Scrollbar(content_frame, orient="vertical", command=canvas.yview)
+    v_scroll.pack(side="right", fill="y")
+    canvas.configure(yscrollcommand=v_scroll.set)
+
+    inner_frame = ttk.Frame(canvas)
+    canvas.create_window((0, 0), window=inner_frame, anchor="nw")
+
+    images = []
+
+    for p in range(sec['start'], min(sec['end'], sec['start'] + 1)):
+        try:
+            pix = doc[p - 1].get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+            img = Image.open(BytesIO(pix.tobytes("ppm")))
+            img = img.resize((800, int(800 * img.height / img.width)), RESAMPLING_MODE)
+            tk_img = ImageTk.PhotoImage(img)
+            images.append(tk_img)
+
+            panel = ttk.Label(inner_frame, image=tk_img)
+            panel.image = tk_img
+            panel.pack(pady=10)
+        except Exception as e:
+            print(f"Failed to render image for page {p}: {e}")
+
+    def on_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    inner_frame.bind("<Configure>", on_configure)
+
+    def on_image_scroll(event):
+        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    canvas.bind("<Enter>", lambda e: root.bind_all("<MouseWheel>", on_image_scroll))
+    canvas.bind("<Leave>", lambda e: root.unbind_all("<MouseWheel>"))
+
+
+def show_section_as_text(sec):
+    for widget in content_frame.winfo_children():
+        widget.destroy()
+
+    textbox = tk.Text(content_frame, wrap='word', bg='white', fg='black', font=("Segoe UI", 12))
+    textbox.pack(fill='both', expand=True)
+
+    text = ""
+    for p in range(sec['start'] - 1, sec['end'] - 1):
+        try:
+            text += doc[p].get_text("text") + "\n"
+        except Exception as e:
+            print(f"Failed to extract text for page {p + 1}: {e}")
+    textbox.insert("1.0", text.strip())
+
+
+# --- Tree Loader ---
+parent_nodes = {}
+
+for sec in parsed_sections:
+    level = sec["level"]
+    title = sec["title"]
+    start, end = sec["start"], sec["end"]
+
+    if level == 1:
+        node = tree.insert("", "end", text=title, open=True, values=(start, end))
+        parent_nodes[1] = node
+    else:
+        parent = parent_nodes.get(level - 1, "")
+        node = tree.insert(parent, "end", text=title, values=(start, end))
+        parent_nodes[level] = node
+
+
+# --- Tree Event Handler ---
+def on_tree_select(event):
+    sel = tree.focus()
+    if not sel:
         return
-    set_name = set_tab_names[set_index - 1]
-    for stage in codex_structure[set_name]:
-        frame = ttk.Frame(stage_notebook)
-        stage_notebook.add(frame, text=after_dash(stage))
-
-def show_parts(set_index, stage_index):
-    clear_notebook(part_notebook)
-    clear_notebook(subpart_notebook)
-    if set_index < 1 or set_index - 1 >= len(set_tab_names):
-        return
-    set_name = set_tab_names[set_index - 1]
-    stage_names = list(codex_structure[set_name].keys())
-    if not stage_names or stage_index >= len(stage_names):
-        return
-    stage_name = stage_names[stage_index]
-    for part in codex_structure[set_name][stage_name]:
-        frame = ttk.Frame(part_notebook)
-        part_notebook.add(frame, text=after_dash(part))
-
-def show_subparts(set_index, stage_index, part_index):
-    clear_notebook(subpart_notebook)
-    if set_index < 1 or set_index - 1 >= len(set_tab_names):
-        return
-    set_name = set_tab_names[set_index - 1]
-    stage_names = list(codex_structure[set_name].keys())
-    if stage_index >= len(stage_names):
-        return
-    stage_name = stage_names[stage_index]
-    part_names = list(codex_structure[set_name][stage_name].keys())
-    if part_index >= len(part_names):
-        return
-    part_name = part_names[part_index]
-    subparts = codex_structure[set_name][stage_name][part_name]
-    # Add "Home" tab first if present
-    if "_home" in subparts:
-        frame = ttk.Frame(subpart_notebook)
-        subpart_notebook.add(frame, text="Home")
-    for subpart in subparts:
-        if subpart == "_home":
-            continue
-        frame = ttk.Frame(subpart_notebook)
-        subpart_notebook.add(frame, text=after_dash(subpart))
-
-def show_content(set_index, stage_index, part_index, subpart_index=None):
-    content_text.delete(1.0, tk.END)
-    if set_index < 1 or set_index - 1 >= len(set_tab_names):
-        return
-    set_name = set_tab_names[set_index - 1]
-    stage_names = list(codex_structure[set_name].keys())
-    if stage_index >= len(stage_names):
-        return
-    stage_name = stage_names[stage_index]
-    part_names = list(codex_structure[set_name][stage_name].keys())
-    if part_index >= len(part_names):
-        return
-    part_name = part_names[part_index]
-    subparts = codex_structure[set_name][stage_name][part_name]
-    if isinstance(subparts, str):
-        content_text.insert(tk.END, subparts)
-        return
-    subpart_names = list(subparts.keys())
-    # If subpart_index is None or 0, show "Home" content if present
-    if subpart_index is None or subpart_index == 0:
-        if "_home" in subparts:
-            content_text.insert(tk.END, subparts["_home"])
-            return
-        elif subpart_names:
-            content_text.insert(tk.END, subparts[subpart_names[0]])
-            return
-    if subpart_index is not None and subpart_index < len(subpart_names):
-        subpart_key = subpart_names[subpart_index]
-        if subpart_key == "_home":
-            content_text.insert(tk.END, subparts["_home"])
+    start, end = tree.item(sel, "values")
+    if start and end:
+        global selected_section
+        selected_section = {"title": tree.item(sel, "text"), "start": int(start), "end": int(end)}
+        if view_mode.get() == "image":
+            show_section_as_image(selected_section)
         else:
-            content_text.insert(tk.END, subparts[subpart_key])
+            show_section_as_text(selected_section)
 
-set_notebook.bind("<<NotebookTabChanged>>", lambda e: [
-    show_stages(set_notebook.index("current")),
-    show_parts(set_notebook.index("current"), 0),
-    show_content(set_notebook.index("current"), 0, 0, 0)
-])
+tree.bind("<<TreeviewSelect>>", on_tree_select)
 
-stage_notebook.bind("<<NotebookTabChanged>>", lambda e: [
-    show_parts(set_notebook.index("current"), stage_notebook.index("current")),
-    show_content(set_notebook.index("current"), stage_notebook.index("current"), 0, 0)
-])
+def toggle_view():
+    if not selected_section:
+        return
+    view_mode.set("text" if view_mode.get() == "image" else "image")
+    if view_mode.get() == "image":
+        show_section_as_image(selected_section)
+    else:
+        show_section_as_text(selected_section)
 
-part_notebook.bind("<<NotebookTabChanged>>", lambda e: [
-    show_subparts(set_notebook.index("current"), stage_notebook.index("current"), part_notebook.index("current")),
-    show_content(set_notebook.index("current"), stage_notebook.index("current"), part_notebook.index("current"), 0)
-])
+toggle_btn.configure(command=toggle_view)
 
-subpart_notebook.bind("<<NotebookTabChanged>>", lambda e:
-    show_content(set_notebook.index("current"), stage_notebook.index("current"), part_notebook.index("current"), subpart_notebook.index("current"))
-)
-
-show_stages(1)
-show_parts(1, 0)
-show_content(1, 0, 0, 0)
+if parsed_sections:
+    selected_section = parsed_sections[0]
+    show_section_as_image(selected_section)
 
 root.mainloop()
