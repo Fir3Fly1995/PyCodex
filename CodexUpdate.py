@@ -7,6 +7,7 @@ import psutil
 import requests
 import shutil
 import webbrowser
+import threading
 
 # --- Config ---
 LOCALAPPDATA = os.environ.get("LOCALAPPDATA")
@@ -15,7 +16,7 @@ CODEX_EXE = os.path.join(CODEX_DIR, "Codex.exe")
 LAUNCHER_EXE = os.path.join(CODEX_DIR, "CodexLauncher.exe")
 CODEX_URL = "https://github.com/Fir3Fly1995/PyCodex/raw/main/dist/Codex.exe"
 LAUNCHER_URL = "https://github.com/Fir3Fly1995/PyCodex/raw/main/dist/CodexLauncher.exe"
-BACKGROUND_IMAGE_PATH = r"D:\GitHub\pyCodex\Images\UpdateBG.png"
+BACKGROUND_IMAGE_PATH = os.path.join(LOCALAPPDATA, "Codex", "UpdateBG.png")
 
 # --- Functions ---
 def kill_processes():
@@ -26,21 +27,39 @@ def kill_processes():
             except Exception:
                 pass
 
-def download_and_replace(url, dest):
-    try:
-        if os.path.exists(dest):
-            os.remove(dest)
-        r = requests.get(url, stream=True)
-        with open(dest, 'wb') as f:
-            shutil.copyfileobj(r.raw, f)
-        # No notification here!
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to update: {e}")
+def threaded_download_and_replace(url, dest, callback=None):
+    def task():
+        try:
+            if os.path.exists(dest):
+                os.remove(dest)
+            r = requests.get(url, stream=True)
+            with open(dest, 'wb') as f:
+                shutil.copyfileobj(r.raw, f)
+            if callback:
+                root.after(0, callback)
+        except Exception as e:
+            root.after(0, lambda: messagebox.showerror("Error", f"Failed to update: {e}"))
+    threading.Thread(target=task, daemon=True).start()
 
 def update_all():
-    download_and_replace(CODEX_URL, CODEX_EXE)
-    download_and_replace(LAUNCHER_URL, LAUNCHER_EXE)
-    exit_and_launch()  # Only exit after both updates
+    btn_update.config(
+        text="Updating...",
+        bg="#4b0000",
+        activebackground="#cc4444",
+        fg="white",
+        activeforeground="white",
+        state="disabled"
+    )
+    # Remove hover bindings so it stays red
+    btn_update.unbind("<Enter>")
+    btn_update.unbind("<Leave>")
+    def after_launcher():
+        exit_and_launch()
+    threaded_download_and_replace(
+        CODEX_URL,
+        CODEX_EXE,
+        lambda: threaded_download_and_replace(LAUNCHER_URL, LAUNCHER_EXE, after_launcher)
+    )
 
 def exit_and_launch():
     try:

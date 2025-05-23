@@ -26,7 +26,10 @@ def check_for_updates():
     codex_dir = os.path.join(os.environ["LOCALAPPDATA"], "Codex")
     updater_path = os.path.join(codex_dir, "CodexUpdate.exe")
     updater_url = "https://github.com/Fir3Fly1995/PyCodex/raw/main/dist/CodexUpdate.exe"
+    bg_url = "https://github.com/Fir3Fly1995/PyCodex/raw/main/Images/CodexBG.png"
+    bg_path = os.path.join(codex_dir, "UpdaterBG.png")
     try:
+        # Download updater
         if os.path.exists(updater_path):
             try:
                 os.remove(updater_path)
@@ -34,13 +37,15 @@ def check_for_updates():
                 messagebox.showerror("Error", f"Could not remove old updater: {e}")
                 return
         urllib.request.urlretrieve(updater_url, updater_path)
+        # Download updater background image
+        urllib.request.urlretrieve(bg_url, bg_path)
         if os.path.exists(updater_path):
             subprocess.Popen([updater_path], cwd=codex_dir)
             root.after(1000, root.destroy)
         else:
             messagebox.showerror("Error", f"CodexUpdate.exe not found at {updater_path}")
     except Exception as e:
-        messagebox.showerror("Error", f"Failed to fetch or launch updater:\n{e}")
+        messagebox.showerror("Error", f"Failed to fetch or launch updater or background:\n{e}")
 
 def close_launcher():
     os._exit(0)
@@ -152,7 +157,7 @@ for btn in (launch_btn, update_btn, uninstall_btn):
 # Version label in the bottom left corner
 version_label = tk.Label(
     root,
-    text="Version Number v32.1",
+    text="Version Number v0.39",
     bg="black",
     fg="#888888",
     font=("Segoe UI", 8),
