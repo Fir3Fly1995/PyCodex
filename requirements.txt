@@ -1,0 +1,4 @@
+psutil
+pymupdf
+fitz
+pyinstaller
