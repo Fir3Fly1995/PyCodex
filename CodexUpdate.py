@@ -26,23 +26,21 @@ def kill_processes():
             except Exception:
                 pass
 
-def download_and_replace(url, dest, button):
+def download_and_replace(url, dest):
     try:
-        button.config(state="disabled")
         if os.path.exists(dest):
             os.remove(dest)
         r = requests.get(url, stream=True)
         with open(dest, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
-        messagebox.showinfo("Success", f"Updated {os.path.basename(dest)} successfully.")
+        # No notification here!
     except Exception as e:
         messagebox.showerror("Error", f"Failed to update: {e}")
-    finally:
-        button.config(state="normal")
 
 def update_all():
-    download_and_replace(CODEX_URL, CODEX_EXE, btn_update)
-    download_and_replace(LAUNCHER_URL, LAUNCHER_EXE, btn_update)
+    download_and_replace(CODEX_URL, CODEX_EXE)
+    download_and_replace(LAUNCHER_URL, LAUNCHER_EXE)
+    exit_and_launch()  # Only exit after both updates
 
 def exit_and_launch():
     try:
